@@ -1,0 +1,194 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+:root {
+  color-scheme: light;
+  /* Surfaces */
+  --background: #F7F8FC;
+  --surface: #FFFFFF;
+  --surface-raised: #FFFFFF;
+  --surface-2: #FAFBFF;
+  --surface-3: #F1F2FA;
+  --surface-hover: #F6F7FD;
+  --brand-soft: #EEF0FE;
+  --border-subtle: #EBEDF7;
+  --border-soft: #E3E6F5;
+
+  /* Text */
+  --ink-900: #0B0E1A;
+  --ink-700: #383C52;
+  --ink-500: #6B7089;
+  --ink-400: #9297AF;
+
+  /* Brand — blue → violet, matched to the ARC arch mark */
+  --arc-blue: #3D5AFE;
+  --arc-blue-2: #5B7CFA;
+  --arc-violet: #8B5CF6;
+  --arc-violet-2: #A78BFA;
+  --arc-gradient: linear-gradient(135deg, var(--arc-blue) 0%, var(--arc-violet) 100%);
+  --arc-gradient-soft: linear-gradient(135deg, rgba(61,90,254,0.10) 0%, rgba(139,92,246,0.10) 100%);
+
+  /* Wallet card — deep navy → indigo → violet (stays premium-dark in both themes) */
+  --wallet-900: #0B0F2B;
+  --wallet-800: #131A45;
+  --wallet-700: #1E2B6B;
+
+  /* Status */
+  --success: #16A34A;
+  --success-soft: #E9F9EF;
+  --danger: #EF4444;
+  --danger-soft: #FDECEC;
+  --warning: #F59E0B;
+  --warning-soft: #FEF6E7;
+
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+
+  --shadow-card: 0 1px 2px rgba(16,24,64,0.04), 0 8px 24px -12px rgba(16,24,64,0.10);
+  --shadow-card-hover: 0 4px 10px rgba(16,24,64,0.06), 0 16px 40px -14px rgba(16,24,64,0.16);
+  --shadow-wallet: 0 20px 60px -16px rgba(31,41,120,0.45);
+}
+
+.dark {
+  color-scheme: dark;
+  /* Surfaces */
+  --background: #0A0B14;
+  --surface: #12131F;
+  --surface-raised: #161827;
+  --surface-2: #171827;
+  --surface-3: #1E2032;
+  --surface-hover: #1B1D2E;
+  --brand-soft: #23244A;
+  --border-subtle: #232538;
+  --border-soft: #2D3049;
+
+  /* Text */
+  --ink-900: #F4F5FA;
+  --ink-700: #C6C9DC;
+  --ink-500: #9599B3;
+  --ink-400: #6C7089;
+
+  /* Status (soft tints darkened so text stays legible) */
+  --success-soft: #10301F;
+  --danger-soft: #3A1A1A;
+  --warning-soft: #3A2A0E;
+
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.55);
+  --shadow-card-hover: 0 4px 10px rgba(0,0,0,0.35), 0 16px 40px -14px rgba(0,0,0,0.65);
+  --shadow-wallet: 0 20px 60px -16px rgba(0,0,0,0.65);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-hover: var(--surface-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-soft: var(--border-soft);
+  --color-ink-900: var(--ink-900);
+  --color-ink-700: var(--ink-700);
+  --color-ink-500: var(--ink-500);
+  --color-ink-400: var(--ink-400);
+  --color-arc-blue: var(--arc-blue);
+  --color-arc-violet: var(--arc-violet);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --font-sans: "SF Pro Display", "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+}
+
+* {
+  border-color: var(--border-subtle);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--ink-900);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 320ms ease, color 320ms ease;
+}
+
+/* Applied to <html> for ~350ms while the theme toggle runs, so every
+   themed surface cross-fades smoothly instead of flashing instantly. */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 320ms ease, border-color 320ms ease,
+    color 320ms ease, box-shadow 320ms ease, fill 320ms ease !important;
+}
+
+::selection {
+  background: rgba(61,90,254,0.18);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D9DCEF; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #C3C8E8; }
+.dark ::-webkit-scrollbar-thumb { background: #2D3049; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #3A3E5C; }
+
+/* Reusable design primitives */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.card-hover {
+  transition: box-shadow .25s ease, transform .25s ease, border-color .25s ease;
+}
+.card-hover:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-soft);
+  transform: translateY(-2px);
+}
+
+.glass {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.6);
+}
+
+.gradient-text {
+  background: var(--arc-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid var(--arc-blue);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
