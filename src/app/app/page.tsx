@@ -22,7 +22,7 @@ export default function AppEntry() {
 }
 
 function Gate() {
-  const { step, address, sessionChecked } = useApp();
+  const { step, address, sessionChecked, hadStoredSession } = useApp();
   const router = useRouter();
   // Tracks whether this tab has held a connected session at any point,
   // so we can tell "just disconnected" apart from "arrived fresh".
@@ -40,25 +40,19 @@ function Gate() {
     // wallet had a chance to reconnect.
     if (!sessionChecked) return;
 
-    // A hard page refresh (not an in-app navigation from the landing page)
-    // while disconnected should never leave the visitor sitting on /app —
-    // send them back to the landing page instead of the connect screen.
-    let isHardRefresh = false;
-    try {
-      const nav = performance.getEntriesByType(
-        "navigation"
-      )[0] as PerformanceNavigationTiming | undefined;
-      isHardRefresh = nav?.type === "reload";
-    } catch {
-      /* Navigation Timing API unavailable — fall through safely below */
-    }
-
-    // Either this is a refresh with no active session, or the wallet was
-    // disconnected while already on this page — both cases redirect home.
-    if (isHardRefresh || hadAddressRef.current) {
+    // Only redirect a disconnected visitor back to the landing page if
+    // they were previously connected — either earlier in this same tab
+    // (hadAddressRef, e.g. just clicked Disconnect), or on this device
+    // before a refresh (hadStoredSession, read from localStorage, which
+    // — unlike the Performance Navigation Timing API — correctly reflects
+    // *this* visit rather than being stuck at whatever the very first
+    // page load of the tab happened to be). A first-time visitor who
+    // simply clicked into /app should just see the connect screen, not
+    // get bounced back to "/".
+    if (hadStoredSession || hadAddressRef.current) {
       router.replace("/");
     }
-  }, [address, sessionChecked, router]);
+  }, [address, sessionChecked, hadStoredSession, router]);
 
   // Still attempting to silently restore a previous session — show a
   // neutral loading state rather than flashing the connect screen or

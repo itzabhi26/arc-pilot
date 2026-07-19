@@ -66,6 +66,12 @@ interface AppState {
   // dashboard route waits for this before ever redirecting to the landing
   // page, so a hard refresh never bounces a still-connected user out.
   sessionChecked: boolean;
+  // Whether a previous session was found in localStorage at all (set
+  // synchronously, independent of whether reconnecting to it succeeds).
+  // Used to tell "returning visitor whose session expired" apart from "a
+  // fresh visitor who just clicked into /app for the first time" — see
+  // src/app/app/page.tsx.
+  hadStoredSession: boolean;
 }
 
 interface AppContextValue extends AppState {
@@ -112,6 +118,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isDepositing: false,
     connectError: null,
     sessionChecked: false,
+    hadStoredSession: false,
   });
 
   const rawProviderRef = React.useRef<Eip1193Provider | null>(null);
@@ -662,6 +669,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isDepositing: false,
       connectError: null,
       sessionChecked: true,
+      hadStoredSession: false,
     });
   }
 
@@ -702,6 +710,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch {
       stored = null;
     }
+    patch({ hadStoredSession: !!stored?.address });
     if (!stored?.address) {
       // Nothing to restore — safe to let the dashboard route redirect
       // immediately if it needs to.
@@ -716,7 +725,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const timeout = setTimeout(markChecked, 2500);
 
     const unsub = walletDiscovery.subscribe(async (connectors) => {
-      if (state.address || connectors.length === 0) return;
+      // Use the ref (always current) rather than `state.address` — this
+      // effect only runs once, so a closure over `state` would stay
+      // frozen at its initial (null) value forever, letting this fire a
+      // duplicate reconnect attempt in the background every time a wallet
+      // extension announces late, even after the user is already
+      // connected. That duplicate attempt could race with (and break) a
+      // manual Connect click.
+      if (rawProviderRef.current || connectors.length === 0) return;
       for (const detail of connectors) {
         try {
           const accounts = (await detail.provider.request({ method: "eth_accounts" })) as string[];
