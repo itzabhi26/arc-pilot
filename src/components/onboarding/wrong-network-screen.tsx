@@ -8,7 +8,7 @@ import { useApp } from "@/components/providers/app-provider";
 import { ARC_TESTNET } from "@/lib/wallet/chain";
 
 export function WrongNetworkScreen() {
-  const { chainId, switchNetwork, isSwitchingNetwork } = useApp();
+  const { chainId, switchNetwork, isSwitchingNetwork, connectError } = useApp();
 
   return (
     <OnboardingShell
@@ -21,6 +21,13 @@ export function WrongNetworkScreen() {
         <Row label="Chain ID" value={String(ARC_TESTNET.chainId)} />
         <Row label="RPC URL" value={ARC_TESTNET.rpcUrls[0]} mono />
       </div>
+
+      {connectError && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl bg-[var(--danger-soft)] px-3.5 py-3 text-xs text-[var(--danger)]">
+          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>{connectError}</span>
+        </div>
+      )}
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <Button

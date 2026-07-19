@@ -116,6 +116,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const rawProviderRef = React.useRef<Eip1193Provider | null>(null);
   const browserProviderRef = React.useRef<BrowserProvider | null>(null);
+  // Holds the detach function for the accountsChanged/chainChanged
+  // listeners currently attached to rawProviderRef.current. Without this,
+  // every reconnect would stack a fresh set of listeners on top of the
+  // previous ones (they're never removed on disconnect), leaking memory
+  // and eventually making the wallet provider misbehave on repeated
+  // connect/disconnect cycles.
+  const detachListenersRef = React.useRef<(() => void) | null>(null);
 
   // Discover installed wallets (EIP-6963)
   React.useEffect(() => {
@@ -246,8 +253,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [deriveStep, resolveSmartWallet]);
 
   async function finishConnect(raw: Eip1193Provider, name: string) {
+    // Remove any listeners left over from a previous connect (e.g. this is
+    // a reconnect after disconnect, or an account switch) before attaching
+    // a fresh set — otherwise listeners accumulate on every cycle.
+    detachListenersRef.current?.();
     rawProviderRef.current = raw;
-    attachListeners(raw);
+    detachListenersRef.current = attachListeners(raw);
 
     const accounts = await requestAccounts(raw);
     const address = accounts[0];
@@ -333,7 +344,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const switchNetwork = React.useCallback(async () => {
     if (!rawProviderRef.current) return;
-    patch({ isSwitchingNetwork: true });
+    patch({ isSwitchingNetwork: true, connectError: null });
     try {
       await switchToArcTestnet(rawProviderRef.current);
       const chainId = await getChainId(rawProviderRef.current);
@@ -361,8 +372,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         refreshBalanceFor(browserProviderRef.current, smartWalletAddress);
         refreshHistoryFor(smartWalletAddress);
       }
-    } catch {
-      patch({ isSwitchingNetwork: false });
+    } catch (err) {
+      const raw = err as { code?: number; message?: string; shortMessage?: string };
+      const message =
+        raw?.code === 4001
+          ? "Network switch was rejected in your wallet."
+          : raw?.shortMessage || raw?.message || "Couldn't switch network. Try again.";
+      patch({ isSwitchingNetwork: false, connectError: message });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deriveStep, state.address, state.smartWalletCreated, state.smartWalletAddress, resolveSmartWallet]);
@@ -606,6 +622,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   function disconnectInternal() {
+    detachListenersRef.current?.();
+    detachListenersRef.current = null;
     rawProviderRef.current = null;
     browserProviderRef.current = null;
     try {
