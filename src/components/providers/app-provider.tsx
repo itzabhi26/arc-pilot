@@ -307,6 +307,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  function describeWalletError(err: unknown, fallback: string): string {
+    const e = err as { code?: number; message?: string; shortMessage?: string } | null;
+    if (e?.code === 4001) return "Request was rejected in your wallet.";
+    if (e?.code === -32002) {
+      return "Your wallet already has a pending request — open the extension and check for a stuck popup, then try again.";
+    }
+    return e?.shortMessage || e?.message || fallback;
+  }
+
   const connectWith = React.useCallback(async (uuid: string) => {
     const detail = walletDiscovery.list.find((d) => d.info.uuid === uuid);
     if (!detail) return;
@@ -316,7 +325,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       patch({
         isConnecting: false,
-        connectError: err instanceof Error ? err.message : "Failed to connect wallet.",
+        connectError: describeWalletError(err, "Failed to connect wallet."),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -336,7 +345,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       patch({
         isConnecting: false,
-        connectError: err instanceof Error ? err.message : "Failed to connect WalletConnect.",
+        connectError: describeWalletError(err, "Failed to connect WalletConnect."),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
