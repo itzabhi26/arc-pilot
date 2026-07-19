@@ -61,6 +61,11 @@ interface AppState {
   isCreatingWallet: boolean;
   isDepositing: boolean;
   connectError: string | null;
+  // Flips true once the initial silent-reconnect attempt (eth_accounts,
+  // no prompt) has resolved — whether it found a session or not. The
+  // dashboard route waits for this before ever redirecting to the landing
+  // page, so a hard refresh never bounces a still-connected user out.
+  sessionChecked: boolean;
 }
 
 interface AppContextValue extends AppState {
@@ -106,6 +111,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isCreatingWallet: false,
     isDepositing: false,
     connectError: null,
+    sessionChecked: false,
   });
 
   const rawProviderRef = React.useRef<Eip1193Provider | null>(null);
@@ -628,6 +634,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isCreatingWallet: false,
       isDepositing: false,
       connectError: null,
+      sessionChecked: true,
     });
   }
 
@@ -654,22 +661,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // visitor back to the landing page instead of showing an in-place
   // connect screen — see src/app/app/page.tsx.
   React.useEffect(() => {
+    let settled = false;
+    const markChecked = () => {
+      if (settled) return;
+      settled = true;
+      patch({ sessionChecked: true });
+    };
+
+    let stored: { address?: string } | null = null;
+    try {
+      const raw = window.localStorage.getItem(SESSION_KEY);
+      stored = raw ? JSON.parse(raw) : null;
+    } catch {
+      stored = null;
+    }
+    if (!stored?.address) {
+      // Nothing to restore — safe to let the dashboard route redirect
+      // immediately if it needs to.
+      markChecked();
+      return;
+    }
+
+    // A previous session exists. Give installed wallets a moment to
+    // announce themselves (EIP-6963) and attempt a silent reconnect
+    // (eth_accounts never prompts the user). Bounded by a timeout so a
+    // refresh never hangs indefinitely if no extension responds.
+    const timeout = setTimeout(markChecked, 2500);
+
     const unsub = walletDiscovery.subscribe(async (connectors) => {
       if (state.address || connectors.length === 0) return;
-      let stored: { address?: string } | null = null;
-      try {
-        const raw = window.localStorage.getItem(SESSION_KEY);
-        stored = raw ? JSON.parse(raw) : null;
-      } catch {
-        stored = null;
-      }
-      if (!stored?.address) return;
-
       for (const detail of connectors) {
         try {
           const accounts = (await detail.provider.request({ method: "eth_accounts" })) as string[];
-          if (accounts?.[0]?.toLowerCase() === stored.address?.toLowerCase()) {
+          if (accounts?.[0]?.toLowerCase() === stored?.address?.toLowerCase()) {
             await finishConnect(detail.provider, detail.info.name);
+            markChecked();
             break;
           }
         } catch {
@@ -677,7 +703,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
     });
-    return unsub;
+
+    return () => {
+      clearTimeout(timeout);
+      unsub();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
