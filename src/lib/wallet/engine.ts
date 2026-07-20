@@ -19,22 +19,64 @@ export async function getChainId(raw: Eip1193Provider): Promise<number> {
   return parseInt(hex, 16);
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function requestSwitch(raw: Eip1193Provider): Promise<void> {
+  await raw.request({
+    method: "wallet_switchEthereumChain",
+    params: [{ chainId: ARC_TESTNET.chainIdHex }],
+  });
+}
+
 export async function switchToArcTestnet(raw: Eip1193Provider): Promise<void> {
   try {
-    await raw.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: ARC_TESTNET.chainIdHex }],
-    });
+    await requestSwitch(raw);
+    return;
   } catch (err) {
     const code = (err as { code?: number })?.code;
-    // 4902 = chain not added to the wallet yet
-    if (code === 4902) {
-      await raw.request({
-        method: "wallet_addEthereumChain",
-        params: [addChainParams()],
-      });
-    } else {
-      throw err;
+    // 4001 = the user explicitly rejected the switch in their wallet —
+    // that's a real rejection, not an "unrecognized chain" problem, so
+    // don't mask it by trying to add the chain next.
+    if (code === 4001) throw err;
+    // Any other failure — including MetaMask's documented 4902
+    // ("unrecognized chain"), but also wallets like Rabby that don't
+    // always report that exact code for the same situation — try adding
+    // the chain next. Adding an already-known chain is a harmless no-op.
+  }
+
+  await raw.request({
+    method: "wallet_addEthereumChain",
+    params: [addChainParams()],
+  });
+
+  // Some wallets (MetaMask) switch automatically right after the chain is
+  // added, so check first instead of unconditionally firing another
+  // switch request.
+  try {
+    const current = await getChainId(raw);
+    if (current === ARC_TESTNET.chainId) return;
+  } catch {
+    // ignore — fall through to the explicit switch below
+  }
+
+  // Rabby in particular has a race condition: right after
+  // wallet_addEthereumChain resolves, its internal chain registry (the
+  // list wallet_switchEthereumChain checks against) hasn't finished
+  // syncing yet, so an immediate switch call fails with the exact same
+  // "Unrecognized chain ID" error as before the chain was even added.
+  // Retrying a few times with a short delay gives Rabby's UI a moment to
+  // catch up instead of surfacing that confusing error to the user.
+  const retryDelaysMs = [300, 600, 1000];
+  for (let attempt = 0; attempt < retryDelaysMs.length; attempt++) {
+    try {
+      await requestSwitch(raw);
+      return;
+    } catch (err) {
+      const code = (err as { code?: number })?.code;
+      if (code === 4001) throw err;
+      const isLastAttempt = attempt === retryDelaysMs.length - 1;
+      if (isLastAttempt) throw err;
+      await sleep(retryDelaysMs[attempt]);
     }
   }
 }
